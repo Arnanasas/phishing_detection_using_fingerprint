@@ -12,6 +12,8 @@ __pycache__/
 /pqgrams
 pqgrams
 
+config.ini
+
 # C extensions
 *.so
 
