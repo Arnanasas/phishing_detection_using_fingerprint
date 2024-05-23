@@ -1,6 +1,8 @@
 import os
 import requests
 from urllib.parse import urljoin, urlparse
+from PIL import Image
+from io import BytesIO
 
 
 class ImageDownloader:
@@ -27,13 +29,10 @@ class ImageDownloader:
         try:
             response = requests.get(url, stream=True)
             if response.status_code == 200:
-                file_extension = self._get_file_extension(url)
-                image_path = os.path.join(
-                    folder_name, f"{image_name}{file_extension}")
-                with open(image_path, 'wb') as file:
-                    for chunk in response.iter_content(1024):
-                        file.write(chunk)
-                print(f"Downloaded: {image_path}")
+                image = Image.open(BytesIO(response.content))
+                image_path = os.path.join(folder_name, f"{image_name}.png")
+                image.save(image_path, 'PNG')
+                print(f"Downloaded and converted to PNG: {image_path}")
             else:
                 print(
                     f"Failed to download {url}: Status code {response.status_code}")
@@ -44,5 +43,5 @@ class ImageDownloader:
         parsed_url = urlparse(url)
         _, file_extension = os.path.splitext(parsed_url.path)
         if not file_extension:
-            return '.jpg'  # Default to jpg if no extension is found
+            return '.jpg'
         return file_extension
