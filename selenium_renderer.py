@@ -69,8 +69,10 @@ class SeleniumRenderer:
 
     def _get_all_image_urls(self, soup):
         image_tags = soup.find_all('img')
-        image_urls = list({img['src']
-                          for img in image_tags if img.has_attr('src')})
+        image_urls = list({
+            img['src'] for img in image_tags
+            if img.has_attr('src') and not img['src'].lower().endswith('.gif')
+        })
         return image_urls
 
     def element_to_json(self, element):
