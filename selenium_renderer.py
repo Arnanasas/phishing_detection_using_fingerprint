@@ -62,8 +62,6 @@ class SeleniumRenderer:
         print(json.dumps(dom_json, indent=4))
 
         # Convert and print JSON to tree structure
-        dom_tree = self.json_to_tree(dom_json)
-        print(dom_tree)
 
     def _get_favicon_link(self, soup):
         icon_link = soup.find('link', rel=lambda x: x and 'icon' in x.lower())
