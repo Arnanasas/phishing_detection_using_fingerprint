@@ -5,8 +5,9 @@ import configparser
 if __name__ == "__main__":
 
     urls = [
-        ("https://facebook.com/login", False),
-        ("https://facebook.com/login", True)
+        "https://facebook.com/login"
+        # # ("https://facebook.com/login", False),
+        # ("https://it112.lt/", False)
     ]
 
     # Initialize the ConfigParser
@@ -23,4 +24,4 @@ if __name__ == "__main__":
     with db:
         db.create_tables()
         renderer = SeleniumRenderer()
-        renderer.process_urls(urls, db)
+        renderer.process_urls(urls)

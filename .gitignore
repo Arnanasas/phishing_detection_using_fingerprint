@@ -12,6 +12,18 @@ __pycache__/
 /pqgrams
 pqgrams
 
+./images
+/images
+images
+
+./favicon
+/favicon
+favicon
+
+./screenshots
+/screenshots
+screenshots
+
 config.ini
 
 # C extensions
