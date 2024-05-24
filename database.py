@@ -2,17 +2,31 @@ import psycopg2
 from psycopg2 import sql, extras
 import json
 import ast
+import tldextract
+import configparser
 
 
 class PostgreSQLDatabase:
     _instance = None
 
-    def __new__(cls, dsn):
+    def __new__(cls, config_file='./config.ini'):
         if cls._instance is None:
             cls._instance = super(PostgreSQLDatabase, cls).__new__(cls)
-            cls._instance.dsn = dsn
+            cls._instance.dsn = cls._get_dsn_from_config(config_file)
             cls._instance.conn = None
         return cls._instance
+
+    @staticmethod
+    def _get_dsn_from_config(config_file):
+        config = configparser.ConfigParser()
+
+        # Read the .ini file
+        config.read('config.ini')
+
+        # Retrieve the DSN string directly
+        dsn = config.get('database', 'dsn')
+        print(dsn)
+        return dsn
 
     def __enter__(self):
         self.open_connection()
@@ -96,3 +110,14 @@ class PostgreSQLDatabase:
         if profile:
             return ast.literal_eval(profile['website_hash'])
         return None
+
+    def strip_domain(self, url):
+        extracted = tldextract.extract(url)
+        return extracted.domain
+
+    def write_website_data(self, url, website_hash, favicon_path, image_paths):
+        stripped_domain = self.strip_domain(url)
+        website_id = self.insert_website(
+            stripped_domain, website_hash, favicon_path)
+        for image_path in image_paths:
+            self.insert_image(website_id, image_path)
