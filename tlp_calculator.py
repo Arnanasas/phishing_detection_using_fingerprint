@@ -1,22 +1,24 @@
 import json
+import os
+import shutil
+from urllib.parse import urlparse
 import time
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
-from pqgrams import tree
+from pqgrams import pqgrams, tree
 from image_downloader import ImageDownloader
-from urllib.parse import urljoin, urlparse
 from database import PostgreSQLDatabase
 
 
-class SeleniumRenderer:
+class TLP_calculator:
     _instance = None
 
     def __new__(cls):
         if cls._instance is None:
-            cls._instance = super(SeleniumRenderer, cls).__new__(cls)
+            cls._instance = super(TLP_calculator, cls).__new__(cls)
             options = webdriver.ChromeOptions()
             options.add_argument('--headless')
             options.add_argument('--no-sandbox')
@@ -35,59 +37,15 @@ class SeleniumRenderer:
         soup = BeautifulSoup(self.driver.page_source, 'html.parser')
         domain_name = urlparse(url).netloc
 
-        # Grab favicon
-        favicon_link = self._get_favicon_link(soup)
-        if favicon_link:
-            favicon_url = urljoin(url, favicon_link)
-            self.downloader.download_favicon(
-                favicon_url, 'favicon', domain_name)
-        print(f"Favicon link: {favicon_link}")
-
-        # Grab all image URLs
-        # Initialize a set to collect unique image URLs
-        unique_images = set()
-
-        for img_tag in soup.find_all("img"):
-            img_src = img_tag.get("src") or img_tag.get("data-src")
-            if img_src and not img_src.lower().endswith(".gif"):
-                # Resolve relative URLs to absolute URLs
-                full_url = urljoin(url, img_src)
-                unique_images.add(full_url)
-
-        image_urls = list(unique_images)
-        self.downloader.download_images(image_urls, 'images', domain_name)
-        image_paths = [
-            f"images/{domain_name}-{index}.png" for index in range(len(image_urls))]
-
-        # Generate and print DOM JSON
+        # Generate DOM JSON
         body_element = soup.find('body')
         dom_json = self.element_to_json(body_element)
-        print(json.dumps(dom_json, indent=4))
 
-        return {
-            'domain_name': domain_name,
-            'favicon_path': favicon_link,
-            'image_paths': image_paths,
-            'dom_json': dom_json
-        }
+        # Calculate and print smallest pq_gram distance
+        self.calculate_smallest_pqgram_distance(dom_json, domain_name)
 
-    def render_and_save_url(self, urls):
-        for url in urls:
-            data = self.render_url(url)
-            self.db.write_website_data(
-                url, data['dom_json'], data['favicon_path'], data['image_paths'])
-
-    def _get_favicon_link(self, soup):
-        icon_link = soup.find('link', rel=lambda x: x and 'icon' in x.lower())
-        return icon_link['href'] if icon_link else None
-
-    def _get_all_image_urls(self, soup):
-        image_tags = soup.find_all('img')
-        image_urls = list({
-            img['src'] for img in image_tags
-            if img.has_attr('src') and not img['src'].lower().endswith('.gif')
-        })
-        return image_urls
+        # Cleanup downloaded images
+        self.cleanup_images(domain_name)
 
     def element_to_json(self, element):
         def should_ignore(element):
@@ -125,6 +83,39 @@ class SeleniumRenderer:
             child_node = self.json_to_tree(child)
             root.addkid(child_node)
         return root
+
+    def calculate_smallest_pqgram_distance(self, dom_json, domain_name):
+        with self.db as db:
+            db.open_connection()
+            get_all_website_hashes = """
+                SELECT website_hash FROM public.website;
+                """
+            website_hashes = self.db.fetch_all(get_all_website_hashes)
+            current_tree = self.json_to_tree(dom_json)
+            current_profile = pqgrams.Profile(current_tree, 2, 3)
+
+            min_distance = float('inf')
+
+            for hash in website_hashes:
+                this_tree = self.json_to_tree(hash[0])
+                db_profile = pqgrams.Profile(this_tree, 2, 3)
+                distance = current_profile.edit_distance(db_profile)
+                if distance < min_distance:
+                    min_distance = distance
+
+            print(f"Smallest pq_gram distance: {min_distance}")
+
+    def cleanup_images(self, domain_name):
+        image_folder = 'images'
+        favicon_folder = 'favicon'
+
+        if os.path.exists(image_folder):
+            shutil.rmtree(image_folder)
+
+        if os.path.exists(favicon_folder):
+            favicon_path = os.path.join(favicon_folder, f"{domain_name}.png")
+            if os.path.exists(favicon_path):
+                os.remove(favicon_path)
 
     def process_urls(self, urls):
         for url in urls:

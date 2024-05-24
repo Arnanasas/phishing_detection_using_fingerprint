@@ -25,7 +25,6 @@ class PostgreSQLDatabase:
 
         # Retrieve the DSN string directly
         dsn = config.get('database', 'dsn')
-        print(dsn)
         return dsn
 
     def __enter__(self):
@@ -121,3 +120,9 @@ class PostgreSQLDatabase:
             stripped_domain, website_hash, favicon_path)
         for image_path in image_paths:
             self.insert_image(website_id, image_path)
+
+    def fetch_all(self, query, params=None):
+        with self.conn.cursor(cursor_factory=extras.DictCursor) as cur:
+            cur.execute(query, params)
+            results = cur.fetchall()
+        return results
