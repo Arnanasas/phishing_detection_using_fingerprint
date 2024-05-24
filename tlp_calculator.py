@@ -11,6 +11,7 @@ from bs4 import BeautifulSoup
 from pqgrams import pqgrams, tree
 from image_downloader import ImageDownloader
 from database import PostgreSQLDatabase
+from urllib.parse import urljoin, urlparse
 
 
 class TLP_calculator:
@@ -41,11 +42,47 @@ class TLP_calculator:
         body_element = soup.find('body')
         dom_json = self.element_to_json(body_element)
 
+        favicon_link = self._get_favicon_link(soup)
+        if favicon_link:
+            favicon_url = urljoin(url, favicon_link)
+            self.downloader.download_favicon(
+                favicon_url, 'favicon', domain_name)
+        print(f"Favicon link: {favicon_link}")
+
+        # Grab all image URLs
+        # Initialize a set to collect unique image URLs
+        unique_images = set()
+
+        for img_tag in soup.find_all("img"):
+            img_src = img_tag.get("src") or img_tag.get("data-src")
+            if img_src and not img_src.lower().endswith(".gif"):
+                # Resolve relative URLs to absolute URLs
+                full_url = urljoin(url, img_src)
+                unique_images.add(full_url)
+
+        image_urls = list(unique_images)
+        self.downloader.download_images(image_urls, 'images', domain_name)
+        image_paths = [
+            f"{domain_name}-{index}.png" for index in range(len(image_urls))]
+
         # Calculate and print smallest pq_gram distance
         self.calculate_smallest_pqgram_distance(dom_json, domain_name)
 
-        # Cleanup downloaded images
-        self.cleanup_images(domain_name)
+        # Cleanup images after calculation
+        self.delete_images(image_paths, './images')
+        self.delete_images([f"{domain_name}.png"], './favicon')
+
+    def _get_favicon_link(self, soup):
+        icon_link = soup.find('link', rel=lambda x: x and 'icon' in x.lower())
+        return icon_link['href'] if icon_link else None
+
+    def _get_all_image_urls(self, soup):
+        image_tags = soup.find_all('img')
+        image_urls = list({
+            img['src'] for img in image_tags
+            if img.has_attr('src') and not img['src'].lower().endswith('.gif')
+        })
+        return image_urls
 
     def element_to_json(self, element):
         def should_ignore(element):
@@ -105,17 +142,20 @@ class TLP_calculator:
 
             print(f"Smallest pq_gram distance: {min_distance}")
 
-    def cleanup_images(self, domain_name):
-        image_folder = 'images'
-        favicon_folder = 'favicon'
+    def delete_images(self, image_list, base_dir):
+        for image_path in image_list:
+            # Create the full path to the image
+            full_path = os.path.join(base_dir, image_path)
 
-        if os.path.exists(image_folder):
-            shutil.rmtree(image_folder)
-
-        if os.path.exists(favicon_folder):
-            favicon_path = os.path.join(favicon_folder, f"{domain_name}.png")
-            if os.path.exists(favicon_path):
-                os.remove(favicon_path)
+            try:
+                # Delete the image file if it exists
+                if os.path.isfile(full_path):
+                    os.remove(full_path)
+                    print(f"Deleted: {full_path}")
+                else:
+                    print(f"File not found: {full_path}")
+            except Exception as e:
+                print(f"Error deleting {full_path}: {e}")
 
     def process_urls(self, urls):
         for url in urls:
