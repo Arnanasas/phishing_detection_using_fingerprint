@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 from pqgrams import tree
 from image_downloader import ImageDownloader
 from urllib.parse import urljoin, urlparse
+from database import PostgreSQLDatabase
 
 
 class SeleniumRenderer:
@@ -22,6 +23,7 @@ class SeleniumRenderer:
             options.add_argument('--disable-dev-shm-usage')
             cls._instance.driver = webdriver.Chrome(options=options)
             cls._instance.downloader = ImageDownloader()
+            cls._instance.db = PostgreSQLDatabase()
         return cls._instance
 
     def render_url(self, url):
@@ -54,12 +56,15 @@ class SeleniumRenderer:
 
         image_urls = list(unique_images)
         self.downloader.download_images(image_urls, 'images', domain_name)
-        print(f"Image URLs: {image_urls}")
+        image_paths = [
+            f"images/{domain_name}-{index}.png" for index in range(len(image_urls))]
 
         # Generate and print DOM JSON
         body_element = soup.find('body')
         dom_json = self.element_to_json(body_element)
         print(json.dumps(dom_json, indent=4))
+
+        self.db.write_website_data(url, dom_json, favicon_link, image_paths)
 
         # Convert and print JSON to tree structure
 
