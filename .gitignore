@@ -20,9 +20,9 @@ images
 /favicon
 favicon
 
-./screenshots
-/screenshots
-screenshots
+./screenshot
+/screenshot
+screenshot
 
 config.ini
 

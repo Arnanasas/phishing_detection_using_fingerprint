@@ -25,6 +25,7 @@ class TLP_calculator:
             options.add_argument('--headless')
             options.add_argument('--no-sandbox')
             options.add_argument('--disable-dev-shm-usage')
+            options.add_argument("window-size=1920,1080")
             cls._instance.driver = webdriver.Chrome(options=options)
             cls._instance.downloader = ImageDownloader()
             cls._instance.db = PostgreSQLDatabase()
@@ -38,6 +39,11 @@ class TLP_calculator:
 
         soup = BeautifulSoup(self.driver.page_source, 'html.parser')
         domain_name = urlparse(url).netloc
+
+        # Define screenshot filename
+        screenshot_folder = os.path.join(os.getcwd(), "screenshot")
+        screenshot_filename = os.path.join(
+            screenshot_folder, f"{domain_name}.png")
 
         # Generate DOM JSON
         body_element = soup.find('body')
@@ -80,7 +86,16 @@ class TLP_calculator:
             f3_result = self.check_image_duplicates('images', image_paths)
             print(f"Feature F3 (Image duplicates): {f3_result}")
 
+        screenshot = self.driver.get_screenshot_as_file(screenshot_filename)
+
+        if screenshot:
+            screenshot_path = os.path.join('screenshot', f"{domain_name}.png")
+            f4_result = self.check_favicon_duplicates(
+                screenshot_path, 'screenshot')
+            print(f"Feature F4 (Screenshot duplicates): {f4_result}")
+
         # Cleanup images after calculation
+        self.delete_images([f"{domain_name}.png"], './screenshot')
         self.delete_images(image_paths, './images')
         self.delete_images([f"{domain_name}.png"], './favicon')
 

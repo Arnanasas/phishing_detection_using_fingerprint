@@ -9,6 +9,7 @@ from pqgrams import tree
 from image_downloader import ImageDownloader
 from urllib.parse import urljoin, urlparse
 from database import PostgreSQLDatabase
+import os
 
 
 class SeleniumRenderer:
@@ -21,6 +22,7 @@ class SeleniumRenderer:
             options.add_argument('--headless')
             options.add_argument('--no-sandbox')
             options.add_argument('--disable-dev-shm-usage')
+            options.add_argument("window-size=1920,1080")
             cls._instance.driver = webdriver.Chrome(options=options)
             cls._instance.downloader = ImageDownloader()
             cls._instance.db = PostgreSQLDatabase()
@@ -35,6 +37,9 @@ class SeleniumRenderer:
 
             soup = BeautifulSoup(self.driver.page_source, 'html.parser')
             domain_name = urlparse(url).netloc
+            screenshot_folder = os.path.join(os.getcwd(), "screenshot")
+            screenshot_filename = os.path.join(
+                screenshot_folder, f"{domain_name}.png")
 
             # Grab favicon
             favicon_link = self._get_favicon_link(soup)
@@ -68,6 +73,7 @@ class SeleniumRenderer:
             body_element = soup.find('body')
             dom_json = self.element_to_json(body_element)
             print(json.dumps(dom_json, indent=4))
+            self.driver.get_screenshot_as_file(screenshot_filename)
 
             return {
                 'domain_name': domain_name,
@@ -76,6 +82,7 @@ class SeleniumRenderer:
                 'dom_json': dom_json
             }
         except Exception as e:
+            print(e)
             print(f"URL {url} is not available")
 
         return None
