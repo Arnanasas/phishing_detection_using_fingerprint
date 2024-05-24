@@ -14,6 +14,23 @@ from database import PostgreSQLDatabase
 from urllib.parse import urljoin, urlparse
 from imagededup.methods import CNN, PHash
 
+import logging
+
+import warnings
+from tqdm import tqdm
+
+# Suppress warnings from „imagededup” logging
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+warnings.filterwarnings("ignore", category=UserWarning, module='torchvision')
+tqdm = lambda *args, **kwargs: None
+logging.getLogger('imagededup').setLevel(logging.CRITICAL)
+logging.getLogger('torchvision').setLevel(logging.CRITICAL)
+logging.getLogger('tensorflow').setLevel(logging.CRITICAL)
+logging.getLogger('PIL').setLevel(logging.CRITICAL)
+logging.getLogger('werkzeug').setLevel(logging.CRITICAL)
+logging.getLogger('urllib3').setLevel(logging.CRITICAL)
+logging.getLogger().setLevel(logging.CRITICAL)
+
 
 class TLP_calculator:
     _instance = None
