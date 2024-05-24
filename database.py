@@ -73,6 +73,15 @@ class PostgreSQLDatabase:
                 image_path VARCHAR(255) NOT NULL,
                 FOREIGN KEY (website_id) REFERENCES Website(website_id) ON DELETE CASCADE
             )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS Soundex (
+                soundex_id SERIAL PRIMARY KEY,
+                website_id INT NOT NULL,
+                primary_value VARCHAR(255) NOT NULL,
+                secondary_value VARCHAR(255),
+                FOREIGN KEY (website_id) REFERENCES Website(website_id) ON DELETE CASCADE
+            )
             """
         )
         try:
@@ -114,15 +123,48 @@ class PostgreSQLDatabase:
         extracted = tldextract.extract(url)
         return extracted.domain
 
+    def insert_soundex(self, website_id, primary_value, secondary_value):
+        query = """
+        INSERT INTO Soundex (website_id, primary_value, secondary_value)
+        VALUES (%s, %s, %s)
+        """
+        params = (website_id, primary_value, secondary_value)
+        self.execute(query, params)
+
     def write_website_data(self, url, website_hash, favicon_path, image_paths):
         stripped_domain = self.strip_domain(url)
         website_id = self.insert_website(
             stripped_domain, website_hash, favicon_path)
         for image_path in image_paths:
             self.insert_image(website_id, image_path)
+        return website_id
 
     def fetch_all(self, query, params=None):
         with self.conn.cursor(cursor_factory=extras.DictCursor) as cur:
             cur.execute(query, params)
             results = cur.fetchall()
         return results
+
+    def check_soundex_matches(self, primary_values, secondary_values):
+        """
+        Check if any of the given Soundex values match those in the database.
+        """
+        matches = []
+
+        # Create a parameterized query to check for matches in the database
+        query = """
+            SELECT DISTINCT website_id FROM Soundex
+            WHERE primary_value = ANY(%s) OR secondary_value = ANY(%s);
+        """
+        try:
+            with self.conn.cursor(cursor_factory=extras.DictCursor) as cur:
+                cur.execute(query, (primary_values, secondary_values))
+                rows = cur.fetchall()
+                for row in rows:
+                    matches.append(row['website_id'])
+
+        except Exception as e:
+            print(f"Error during soundex matching: {e}")
+            raise
+
+        return matches

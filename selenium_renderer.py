@@ -10,6 +10,9 @@ from image_downloader import ImageDownloader
 from urllib.parse import urljoin, urlparse
 from database import PostgreSQLDatabase
 import os
+import re
+from metaphone import doublemetaphone
+import tldextract
 
 
 class SeleniumRenderer:
@@ -75,8 +78,13 @@ class SeleniumRenderer:
             print(json.dumps(dom_json, indent=4))
             self.driver.get_screenshot_as_file(screenshot_filename)
 
+            ext = tldextract.extract(url)
+
+            stripped_domain_name = ext.domain
+
             return {
                 'domain_name': domain_name,
+                'stripped_domain_name': stripped_domain_name,
                 'favicon_path': favicon_link,
                 'image_paths': image_paths,
                 'dom_json': dom_json
@@ -143,6 +151,34 @@ class SeleniumRenderer:
             root.addkid(child_node)
         return root
 
-    def process_urls(self, urls):
+    def render_and_save_url(self, urls, is_phishing):
         for url in urls:
-            self.render_url(url)
+            if not is_phishing:
+                data = self.render_url(url)
+                if data is not None:
+                    primary, secondary = self.double_metaphone(
+                        data['stripped_domain_name'])
+
+                    print(primary)
+                    print(secondary)
+                    website_id = self.db.write_website_data(
+                        url, data['dom_json'], data['favicon_path'], data['image_paths'])
+                    self.db.insert_soundex(website_id, primary, secondary)
+            else:
+                self.render_url(url)
+
+    def double_metaphone(self, domain_name):
+        """ Clean domain_name from top level domain """
+        domain_name_cleared = re.sub(r'[„“”]', '', domain_name)
+        if '.' in domain_name_cleared:
+            # Split the domain name by '.'
+            parts = domain_name_cleared.split('.')
+            parts = parts[:-1]
+            name = '.join(parts)'
+        else:
+            # if the name is empty after removal of last array item, keep as it is
+            name = domain_name_cleared
+
+        # Compute the double metaphone values
+        primary, secondary = doublemetaphone(name)
+        return (primary, secondary)
