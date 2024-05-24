@@ -27,55 +27,65 @@ class SeleniumRenderer:
         return cls._instance
 
     def render_url(self, url):
-        self.driver.get(url)
-        WebDriverWait(self.driver, 10).until(
-            EC.presence_of_element_located((By.TAG_NAME, 'body')))
-        time.sleep(5)
+        try:
+            self.driver.get(url)
+            WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.TAG_NAME, 'body')))
+            time.sleep(5)
 
-        soup = BeautifulSoup(self.driver.page_source, 'html.parser')
-        domain_name = urlparse(url).netloc
+            soup = BeautifulSoup(self.driver.page_source, 'html.parser')
+            domain_name = urlparse(url).netloc
 
-        # Grab favicon
-        favicon_link = self._get_favicon_link(soup)
-        if favicon_link:
-            favicon_url = urljoin(url, favicon_link)
-            self.downloader.download_favicon(
-                favicon_url, 'favicon', domain_name)
-        print(f"Favicon link: {favicon_link}")
+            # Grab favicon
+            favicon_link = self._get_favicon_link(soup)
+            if favicon_link:
+                favicon_url = urljoin(url, favicon_link)
+                self.downloader.download_favicon(
+                    favicon_url, 'favicon', domain_name)
+            print(f"Favicon link: {favicon_link}")
 
-        # Grab all image URLs
-        # Initialize a set to collect unique image URLs
-        unique_images = set()
+            # Change this later
+            if favicon_link is None:
+                favicon_link = 'none'
 
-        for img_tag in soup.find_all("img"):
-            img_src = img_tag.get("src") or img_tag.get("data-src")
-            if img_src and not img_src.lower().endswith(".gif"):
-                # Resolve relative URLs to absolute URLs
-                full_url = urljoin(url, img_src)
-                unique_images.add(full_url)
+            # Grab all image URLs
+            # Initialize a set to collect unique image URLs
+            unique_images = set()
 
-        image_urls = list(unique_images)
-        self.downloader.download_images(image_urls, 'images', domain_name)
-        image_paths = [
-            f"images/{domain_name}-{index}.png" for index in range(len(image_urls))]
+            for img_tag in soup.find_all("img"):
+                img_src = img_tag.get("src") or img_tag.get("data-src")
+                if img_src and not img_src.lower().endswith(".gif"):
+                    # Resolve relative URLs to absolute URLs
+                    full_url = urljoin(url, img_src)
+                    unique_images.add(full_url)
 
-        # Generate and print DOM JSON
-        body_element = soup.find('body')
-        dom_json = self.element_to_json(body_element)
-        print(json.dumps(dom_json, indent=4))
+            image_urls = list(unique_images)
+            self.downloader.download_images(image_urls, 'images', domain_name)
+            image_paths = [
+                f"images/{domain_name}-{index}.png" for index in range(len(image_urls))]
 
-        return {
-            'domain_name': domain_name,
-            'favicon_path': favicon_link,
-            'image_paths': image_paths,
-            'dom_json': dom_json
-        }
+            # Generate and print DOM JSON
+            body_element = soup.find('body')
+            dom_json = self.element_to_json(body_element)
+            print(json.dumps(dom_json, indent=4))
+
+            return {
+                'domain_name': domain_name,
+                'favicon_path': favicon_link,
+                'image_paths': image_paths,
+                'dom_json': dom_json
+            }
+        except Exception as e:
+            print(f"URL {url} is not available")
+
+        return None
 
     def render_and_save_url(self, urls):
         for url in urls:
             data = self.render_url(url)
-            self.db.write_website_data(
-                url, data['dom_json'], data['favicon_path'], data['image_paths'])
+            if data is not None:
+                self.db.write_website_data(
+                    url, data['dom_json'], data['favicon_path'], data['image_paths'])
 
     def _get_favicon_link(self, soup):
         icon_link = soup.find('link', rel=lambda x: x and 'icon' in x.lower())
