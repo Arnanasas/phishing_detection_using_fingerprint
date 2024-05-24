@@ -22,3 +22,16 @@ def get_urls_by_target(file_path, target, start, end):
                 urls.append(row['url'])
 
     return urls[start:end]
+
+
+def get_tlp_value(ri):
+    if 0 <= ri <= 1:
+        return "TLP:WHITE"
+    elif 1 < ri <= 3:
+        return "TLP:GREEN"
+    elif 3 < ri <= 5:
+        return "TLP:AMBER"
+    elif 5 < ri <= 10:
+        return "TLP:RED"
+    else:
+        return "Unknown"

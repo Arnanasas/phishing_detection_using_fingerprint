@@ -17,6 +17,9 @@ import ssl
 import socket
 import re
 from metaphone import doublemetaphone
+import csv
+
+from helpers import get_tlp_value
 
 import logging
 
@@ -141,6 +144,9 @@ class TLP_calculator:
         print(f"Feature F5 (SSL issuer): {f5_result}")
         print(f"Feature F6 (Phonetic algorithm): {f6_result}")
 
+        risk_index, weighted_features = self.calculate_risk_index(
+            domain_name, f1_result, f2_result, f3_result, f4_result, f5_result, f6_result)
+
     def _get_favicon_link(self, soup):
         icon_link = soup.find('link', rel=lambda x: x and 'icon' in x.lower())
         return icon_link['href'] if icon_link else None
@@ -189,6 +195,70 @@ class TLP_calculator:
             child_node = self.json_to_tree(child)
             root.addkid(child_node)
         return root
+
+    def calculate_risk_index(self, domain_name, f1, f2, f3, f4, f5, f6):
+        # Ensure all features have values
+        if f1 is None:
+            raise ValueError("Feature 1 must exist.")
+        if f2 is None:
+            f2 = 0.5
+        if f3 is None or f4 is None or f5 is None:
+            raise ValueError("Features 3-5 must exist.")
+        if f6 is None:
+            f6 = 0
+        elif isinstance(f6, list) and len(f6) > 0:
+            f6 = 1
+        else:
+            f6 = 0
+
+        # Define feature weights
+        feature_weights = {
+            'f1': 2,
+            'f2': 1.5,
+            'f3': 1.5,
+            'f4': 2,
+            'f5': 1,
+            'f6': 2
+        }
+
+        # Calculate weighted features
+        weighted_features = {
+            'f1': f1 * feature_weights['f1'],
+            'f2': f2 * feature_weights['f2'],
+            'f3': f3 * feature_weights['f3'],
+            'f4': f4 * feature_weights['f4'],
+            'f5': f5 * feature_weights['f5'],
+            'f6': f6 * feature_weights['f6']
+        }
+
+        # Calculate risk index
+        risk_index = sum(weighted_features.values())
+
+        # Write results to CSV
+        results_path = os.path.join(os.getcwd(), 'results.csv')
+
+        tlp_value = get_tlp_value(risk_index)
+        with open(results_path, 'a', newline='') as csvfile:
+            fieldnames = ['domain_name', 'risk_index',
+                          'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'TLP']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+            if csvfile.tell() == 0:
+                writer.writeheader()
+
+            writer.writerow({
+                'domain_name': domain_name,
+                'risk_index': risk_index,
+                'f1': weighted_features['f1'],
+                'f2': weighted_features['f2'],
+                'f3': weighted_features['f3'],
+                'f4': weighted_features['f4'],
+                'f5': weighted_features['f5'],
+                'f6': weighted_features['f6'],
+                'TLP': tlp_value
+            })
+
+        return risk_index, weighted_features
 
     def calculate_smallest_pqgram_distance(self, dom_json, domain_name):
         with self.db as db:

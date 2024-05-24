@@ -19,12 +19,12 @@ if __name__ == "__main__":
     dsn = config.get('database', 'dsn')
 
     facebook = ['https://facebook.com/login']
-    is_phishing = bool(0)
+    is_phishing = bool(1)
     # Render and save url's
     db = PostgreSQLDatabase(dsn)
     with db:
         db.create_tables()
-        # renderer = SeleniumRenderer()
-        # renderer.render_and_save_url(facebook, is_phishing)
+        renderer = SeleniumRenderer()
+        renderer.render_and_save_url(train_urls, is_phishing)
         calculator = TLP_calculator()
-        calculator.process_urls(facebook)
+        calculator.process_urls(test_urls)
