@@ -12,6 +12,7 @@ from pqgrams import pqgrams, tree
 from image_downloader import ImageDownloader
 from database import PostgreSQLDatabase
 from urllib.parse import urljoin, urlparse
+from imagededup.methods import CNN, PHash
 
 
 class TLP_calculator:
@@ -67,6 +68,17 @@ class TLP_calculator:
 
         # Calculate and print smallest pq_gram distance
         self.calculate_smallest_pqgram_distance(dom_json, domain_name)
+
+        # Check for favicon duplicates
+        if favicon_link:
+            favicon_path = os.path.join('favicon', f"{domain_name}.png")
+            f2_result = self.check_favicon_duplicates(favicon_path, 'favicon')
+            print(f"Feature F2 (Favicon duplicates): {f2_result}")
+
+        # Check for image duplicates
+        if image_paths:
+            f3_result = self.check_image_duplicates('images', image_paths)
+            print(f"Feature F3 (Image duplicates): {f3_result}")
 
         # Cleanup images after calculation
         self.delete_images(image_paths, './images')
@@ -160,3 +172,26 @@ class TLP_calculator:
     def process_urls(self, urls):
         for url in urls:
             self.render_url(url)
+
+    def check_favicon_duplicates(self, favicon_path, base_dir):
+        hasher = CNN()
+        if os.path.exists(favicon_path):
+            return self.check_for_duplicates(hasher, base_dir, [os.path.basename(favicon_path)])
+        return 0
+
+    def check_image_duplicates(self, base_dir, image_paths):
+        hasher = PHash()
+        image_names = [os.path.basename(path) for path in image_paths]
+        return self.check_for_duplicates(hasher, base_dir, image_names)
+
+    def check_for_duplicates(self, hasher, image_dir, image_names):
+        # Generate encodings for all images in the specified directory
+        encodings = hasher.encode_images(image_dir=image_dir)
+        duplicates = hasher.find_duplicates(encoding_map=encodings)
+
+        # Check if any of the specified images have duplicates
+        for image_name in image_names:
+            if image_name in duplicates and duplicates[image_name]:
+                # print(f"{image_name} duplicates: {duplicates[image_name]}")
+                return 1
+        return 0
